@@ -1,20 +1,117 @@
-name: Jekyll site CI
+＃ =================================================
+＃https://github.com/kenzok8/openwrt-packages.git
+＃说明：使用GitHub Actions构建OpenWrt
+＃牌照：麻省理工学院
+＃作者：P3TERX
+＃博客：https：//p3terx.com
+＃ =================================================
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+名称：构建OpenWrt
 
-jobs:
-  build:
+在：
+  发布：
+    类型：[已发布]
+  推送：
+    分行：
+      -开发稀勒德
+    路径：
+      - '. config '
+＃  时间表：
+＃     -cron：0 8 * * 5
+  观看：
+    类型：[开始]
 
-    runs-on: ubuntu-latest
+env：
+  REPO_URL：https : //github.com/kenzok8/openwrt-packages.git
+  REPO_BRANCH：开发精简版
+  CONFIG_FILE：.config
+  DIY_SH：diy.sh
+  FREE_UP_DISK：错误
+  SSH_ACTIONS：是
+  UPLOAD_BIN_DIR：假
+  UPLOAD_FIRMWARE：是
+  TZ：亚洲/上海
 
-    steps:
-    - uses: actions/checkout@v2
-    - name: Build the site in the jekyll/builder container
-      run: |
-        docker run \
-        -v ${{ github.workspace }}:/srv/jekyll -v ${{ github.workspace }}/_site:/srv/jekyll/_site \
-        jekyll/builder:latest /bin/bash -c "chmod 777 /srv/jekyll && jekyll build --future"
+职位：
+  建立：
+    运行：ubuntu-latest
+
+    步骤：
+    -名称：结帐
+      用途：actions / checkout @ master
+
+    -名称：初始化环境
+      env：
+        DEBIAN_FRONTEND：非互动
+      运行：|
+        sudo swapoff /交换文件
+        sudo rm -rf / swapfile /etc/apt/sources.list.d/*
+        sudo -E apt-get -qq更新
+        sudo -E apt-get -qq install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl -dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler
+        curl -fsSL https://raw.githubusercontent.com/P3TERX/dotfiles/master/.bashrc >>〜/ .bashrc
+    -名称：释放磁盘空间
+      如果：env.FREE_UP_DISK =='true'
+      env：
+        DEBIAN_FRONTEND：非互动
+      运行：|
+        须藤rm -rf / usr / share / dotnet
+        docker rmi`docker images -q`
+        须藤-E apt-get -q清除azure-cli ghc * zulu * hhvm llvm * firefox google * dotnet * powershell openjdk * mysql * php *
+        须藤-E apt-get -qq autoremove --purge
+        须藤-E apt-get -qq clean
+    -名称：克隆的源代码
+      运行：git clone --depth 1 $ REPO_URL -b $ REPO_BRANCH openwrt
+
+    -名称：更新供稿
+      运行：cd openwrt && ./scripts/feeds update -a
+
+    -名称：安装供稿
+      运行：cd openwrt && ./scripts/feeds install -a
+
+    -名称：加载自定义配置
+      运行：|
+        [-e文件] && mv文件openwrt /文件
+        [-e $ CONFIG_FILE] && mv $ CONFIG_FILE openwrt / .config
+        chmod + x $ DIY_SH
+        cd openwrt
+        ../$DIY_SH
+        使defconfig
+    -名称：SSH连接到操作
+      用途：P3TERX / debugger-action @ master
+      如果：env.SSH_ACTIONS =='true'
+
+    -名称：下载包
+      id：包裹
+      运行：|
+        cd openwrt
+        进行下载-j8
+        找到dl -size -1024c -exec ls -l {} \;
+        找到dl -size -1024c -exec rm -f {} \;
+    -名称：编译固件
+      id：编译
+      运行：|
+        cd openwrt
+        echo -e“ $（nproc）线程编译”
+        使-j $（nproc）|| 使-j1 V = s
+        回声“ :: set-output name = status :: success”
+    -名称：上载bin目录
+      用途：actions / upload-artifact @ master
+      if：steps.compile.outputs.status =='成功'&& env.UPLOAD_BIN_DIR =='true'
+      与：
+        名称：OpenWrt_directory
+        路径：openwrt / bin
+
+    -名称：整理文件
+      id：整理
+      如果：env.UPLOAD_FIRMWARE =='true'&&！cancelled（）
+      运行：|
+        cd openwrt / bin / targets / * / *
+        rm -rf软件包
+        回声“ :: set-env name = FIRMWARE :: $（pwd）”
+        回声“ :: set-output name = status :: success”
+    -名称：上传固件目录
+      用途：actions / upload-artifact @ master
+      如果：steps.organize.outputs.status =='成功'&&！cancelled（）
+      与：
+        名称：OpenWrt_firmware
+        路径：$ {{env.FIRMWARE}}
